@@ -1,8 +1,23 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 
+from flask_swagger_ui import get_swaggerui_blueprint
+
 app = Flask(__name__)
 CORS(app)  # This will enable CORS for all routes
+
+
+SWAGGER_URL="/api/docs"  # (1) swagger endpoint e.g. HTTP://localhost:5002/api/docs
+API_URL="/static/masterblog.json" # (2) ensure you create this dir and file
+
+swagger_ui_blueprint = get_swaggerui_blueprint(
+    SWAGGER_URL,
+    API_URL,
+    config={
+        'app_name': 'Masterblog API' # (3) You can change this if you like
+    }
+)
+app.register_blueprint(swagger_ui_blueprint, url_prefix=SWAGGER_URL)
 
 POSTS = [
     {"id": 1, "title": "First post", "content": "This is the first post."},
@@ -18,7 +33,26 @@ def find_post_by_id(post_id):
 
 @app.route('/api/posts', methods=['GET'])
 def get_posts():
+    sort_field = request.args.get('sort')
+    direction = request.args.get('direction', 'asc').lower()
+
+    # If sort_field is provided, we need to sort the posts
+    if sort_field:
+        # Check if the sort field is valid (either 'title' or 'content')
+        if sort_field not in ['title', 'content']:
+            return jsonify({"error": "Invalid sort field. Choose 'title' or 'content'."}), 400
+
+        # Sort based on the direction
+        reverse = direction == 'desc'
+
+        # Sort the posts by the specified field and direction
+        POSTS_sorted = sorted(POSTS, key=lambda post: post.get(sort_field, ''), reverse=reverse)
+
+        return jsonify(POSTS_sorted)
+
+    # If no sorting is provided, return posts in the original order
     return jsonify(POSTS)
+
 
 
 @app.route('/api/posts', methods=['POST'])
@@ -96,9 +130,6 @@ def search_post():
     if content:
         filtered_posts = [post for post in POSTS if content.lower() in post.get('content', '').lower()]
         return jsonify(filtered_posts)
-
-
-
 
 
 
